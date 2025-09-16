@@ -29,41 +29,27 @@ async def create_task(db: AsyncSession, data: TaskCreate) -> Task:
         if data.checklist is not None
         else None
     )
+    provider_id = data.provider_id
+    customer_hint_data = data.customer_hint
+    sla_due_at = data.sla_due_at
 
     filters = [
         Task.order_item_id == data.order_item_id,
         Task.service_type == data.service_type,
     ]
 
-    if checklist_data is None:
-        filters.append(Task.checklist.is_(None))
-    else:
-        filters.append(Task.checklist == checklist_data)
-
-    if data.provider_id is None:
-        filters.append(Task.provider_id.is_(None))
-    else:
-        filters.append(Task.provider_id == data.provider_id)
-
-    if location_data is None:
-        filters.append(Task.location.is_(None))
-    else:
-        filters.append(Task.location == location_data)
-
-    if flight_data is None:
-        filters.append(Task.flight.is_(None))
-    else:
-        filters.append(Task.flight == flight_data)
-
-    if data.customer_hint is None:
-        filters.append(Task.customer_hint.is_(None))
-    else:
-        filters.append(Task.customer_hint == data.customer_hint)
-
-    if data.sla_due_at is None:
-        filters.append(Task.sla_due_at.is_(None))
-    else:
-        filters.append(Task.sla_due_at == data.sla_due_at)
+    for column, value in [
+        (Task.provider_id, provider_id),
+        (Task.location, location_data),
+        (Task.flight, flight_data),
+        (Task.customer_hint, customer_hint_data),
+        (Task.checklist, checklist_data),
+        (Task.sla_due_at, sla_due_at),
+    ]:
+        if value is None:
+            filters.append(column.is_(None))
+        else:
+            filters.append(column == value)
 
     existing_stmt = select(Task).where(*filters)
     existing_res = await db.execute(existing_stmt)
@@ -74,12 +60,12 @@ async def create_task(db: AsyncSession, data: TaskCreate) -> Task:
     task = Task(
         order_item_id=data.order_item_id,
         service_type=data.service_type,
-        provider_id=data.provider_id,
+        provider_id=provider_id,
         location=location_data,
         flight=flight_data,
-        customer_hint=data.customer_hint,
+        customer_hint=customer_hint_data,
         checklist=checklist_data,
-        sla_due_at=data.sla_due_at,
+        sla_due_at=sla_due_at,
     )
     db.add(task)
     await db.flush()
@@ -113,7 +99,8 @@ async def set_status(
         raise InvalidStatusTransition(task.status, new_status)
 
     task.status = new_status
-    db.add(TaskEvent(task_id=task_id, code=event, payload=payload))
+    event_payload = payload.copy() if payload is not None else None
+    db.add(TaskEvent(task_id=task_id, code=event, payload=event_payload))
     await db.commit()
     await db.refresh(task)
     return task

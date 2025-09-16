@@ -65,7 +65,13 @@ async def start_task(task_id: UUID, db: AsyncSession = Depends(get_db)):
 
 @app.post("/tasks/{task_id}/scan", response_model=TaskOut)
 async def scan_qr(task_id: UUID, payload: ScanPayload, db: AsyncSession = Depends(get_db)):
-    return await _change_status(db, task_id, TaskStatus.in_progress, "SCANNED", payload.model_dump())
+    return await _change_status(
+        db,
+        task_id,
+        TaskStatus.in_progress,
+        "SCANNED",
+        payload.model_dump(mode="json"),
+    )
 
 
 @app.post("/tasks/{task_id}/complete", response_model=TaskOut)
@@ -75,4 +81,10 @@ async def complete_task(task_id: UUID, db: AsyncSession = Depends(get_db)):
 
 @app.post("/tasks/{task_id}/fail", response_model=TaskOut)
 async def fail_task(task_id: UUID, payload: FailPayload, db: AsyncSession = Depends(get_db)):
-    return await _change_status(db, task_id, TaskStatus.failed, "FAILED", payload.model_dump())
+    return await _change_status(
+        db,
+        task_id,
+        TaskStatus.failed,
+        "FAILED",
+        payload.model_dump(mode="json"),
+    )
