@@ -38,7 +38,7 @@ class TaskOut(BaseModel):
     location: Optional[Location]
     flight: Optional[Flight]
     customer_hint: Optional[dict]
-    status: Literal["new","assigned","in_progress","done","failed"]
+    status: Literal["new","assigned","in_progress","done","failed","cancelled"]
     checklist: Optional[List[ChecklistItem]]
     sla_due_at: Optional[datetime]
     created_at: datetime

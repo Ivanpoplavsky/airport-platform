@@ -30,6 +30,8 @@ async def get_tasks(status: List[TaskStatus] = Query(default=[]), db: AsyncSessi
     return tasks
 
 def _handle_transition_error(exc: InvalidStatusTransition) -> HTTPException:
+    """Convert a failed transition into a conflict response."""
+
     return HTTPException(status_code=409, detail=str(exc))
 
 
@@ -43,7 +45,7 @@ async def _change_status(
     try:
         return await service.set_status(db, task_id, new_status, event, payload)
     except InvalidStatusTransition as exc:
-        raise _handle_transition_error(exc)
+        raise _handle_transition_error(exc) from exc
 
 
 # Создать задачу (для демонстрации/seed)
