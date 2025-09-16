@@ -22,10 +22,50 @@ ALLOWED_TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
 }
 
 async def create_task(db: AsyncSession, data: TaskCreate) -> Task:
-    existing_stmt = select(Task).where(
+    location_data = data.location.model_dump(mode="json") if data.location else None
+    flight_data = data.flight.model_dump(mode="json") if data.flight else None
+    checklist_data = (
+        [c.model_dump(mode="json") for c in data.checklist]
+        if data.checklist is not None
+        else None
+    )
+
+    filters = [
         Task.order_item_id == data.order_item_id,
         Task.service_type == data.service_type,
-    )
+    ]
+
+    if checklist_data is None:
+        filters.append(Task.checklist.is_(None))
+    else:
+        filters.append(Task.checklist == checklist_data)
+
+    if data.provider_id is None:
+        filters.append(Task.provider_id.is_(None))
+    else:
+        filters.append(Task.provider_id == data.provider_id)
+
+    if location_data is None:
+        filters.append(Task.location.is_(None))
+    else:
+        filters.append(Task.location == location_data)
+
+    if flight_data is None:
+        filters.append(Task.flight.is_(None))
+    else:
+        filters.append(Task.flight == flight_data)
+
+    if data.customer_hint is None:
+        filters.append(Task.customer_hint.is_(None))
+    else:
+        filters.append(Task.customer_hint == data.customer_hint)
+
+    if data.sla_due_at is None:
+        filters.append(Task.sla_due_at.is_(None))
+    else:
+        filters.append(Task.sla_due_at == data.sla_due_at)
+
+    existing_stmt = select(Task).where(*filters)
     existing_res = await db.execute(existing_stmt)
     existing_task = existing_res.scalar_one_or_none()
     if existing_task:
@@ -35,10 +75,10 @@ async def create_task(db: AsyncSession, data: TaskCreate) -> Task:
         order_item_id=data.order_item_id,
         service_type=data.service_type,
         provider_id=data.provider_id,
-        location=data.location.model_dump(mode="json") if data.location else None,
-        flight=data.flight.model_dump(mode="json") if data.flight else None,
+        location=location_data,
+        flight=flight_data,
         customer_hint=data.customer_hint,
-        checklist=[c.model_dump(mode="json") for c in (data.checklist or [])],
+        checklist=checklist_data,
         sla_due_at=data.sla_due_at,
     )
     db.add(task)
