@@ -10,10 +10,10 @@ async def create_task(db: AsyncSession, data: TaskCreate) -> Task:
         order_item_id=data.order_item_id,
         service_type=data.service_type,
         provider_id=data.provider_id,
-        location=data.location.model_dump() if data.location else None,
-        flight=data.flight.model_dump() if data.flight else None,
+        location=data.location.model_dump(mode="json") if data.location else None,
+        flight=data.flight.model_dump(mode="json") if data.flight else None,
         customer_hint=data.customer_hint,
-        checklist=[c.model_dump() for c in (data.checklist or [])],
+        checklist=[c.model_dump(mode="json") for c in (data.checklist or [])],
         sla_due_at=data.sla_due_at,
     )
     db.add(task)
