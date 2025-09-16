@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Literal
 from datetime import datetime
 from uuid import UUID
@@ -29,6 +29,8 @@ class TaskCreate(BaseModel):
     sla_due_at: Optional[datetime] = None
 
 class TaskOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     order_item_id: str
     service_type: str
