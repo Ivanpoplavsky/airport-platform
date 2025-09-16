@@ -1,4 +1,8 @@
 from pydantic import BaseModel
+try:
+    from pydantic import ConfigDict  # type: ignore
+except ImportError:  # pragma: no cover - pydantic v1 fallback
+    ConfigDict = None  # type: ignore
 from typing import Optional, List, Literal
 from datetime import datetime
 from uuid import UUID
@@ -29,6 +33,12 @@ class TaskCreate(BaseModel):
     sla_due_at: Optional[datetime] = None
 
 class TaskOut(BaseModel):
+    if ConfigDict is not None:
+        model_config = ConfigDict(from_attributes=True)
+
+    class Config:
+        orm_mode = True
+
     id: UUID
     order_item_id: str
     service_type: str
