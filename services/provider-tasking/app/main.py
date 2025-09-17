@@ -1,7 +1,7 @@
-from fastapi import FastAPI, Depends, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
-from typing import List
+from typing import Any, Callable, List
 
 from .db import SessionLocal, init_db
 from . import service
@@ -28,33 +28,62 @@ async def get_tasks(status: List[TaskStatus] = Query(default=[]), db: AsyncSessi
     tasks = await service.list_tasks(db, statuses=status or None)
     return tasks
 
+def _handle_transition_error(exc: service.InvalidStatusTransition) -> HTTPException:
+    return HTTPException(status_code=409, detail=str(exc))
+
+
+def _model_to_dict(model: object | None) -> dict | None:
+    if model is None:
+        return None
+    dump: Callable[[], Any] | None = getattr(model, "model_dump", None)  # type: ignore[assignment]
+    if callable(dump):
+        return dump()
+    legacy_dump: Callable[[], Any] | None = getattr(model, "dict", None)  # type: ignore[assignment]
+    if callable(legacy_dump):
+        return legacy_dump()
+    raise TypeError("Unsupported payload type for status transition")
+
+
+async def _change_status(
+    db: AsyncSession,
+    task_id: UUID,
+    new_status: TaskStatus,
+    event: str,
+    payload: dict | None = None,
+):
+    try:
+        return await service.set_status(db, task_id, new_status, event, payload)
+    except service.InvalidStatusTransition as exc:
+        raise _handle_transition_error(exc)
+
+
 # Создать задачу (для демонстрации/seed)
 @app.post("/tasks", response_model=TaskOut, status_code=201)
 async def create_task(payload: TaskCreate, db: AsyncSession = Depends(get_db)):
     t = await service.create_task(db, payload)
     return t
 
+
 @app.post("/tasks/{task_id}/accept", response_model=TaskOut)
 async def accept_task(task_id: UUID, db: AsyncSession = Depends(get_db)):
-    t = await service.set_status(db, task_id, TaskStatus.assigned, "ACCEPTED")
-    return t
+    return await _change_status(db, task_id, TaskStatus.assigned, "ACCEPTED")
+
 
 @app.post("/tasks/{task_id}/start", response_model=TaskOut)
 async def start_task(task_id: UUID, db: AsyncSession = Depends(get_db)):
-    t = await service.set_status(db, task_id, TaskStatus.in_progress, "STARTED")
-    return t
+    return await _change_status(db, task_id, TaskStatus.in_progress, "STARTED")
+
 
 @app.post("/tasks/{task_id}/scan", response_model=TaskOut)
 async def scan_qr(task_id: UUID, payload: ScanPayload, db: AsyncSession = Depends(get_db)):
-    t = await service.set_status(db, task_id, TaskStatus.in_progress, "SCANNED", payload.model_dump())
-    return t
+    return await _change_status(db, task_id, TaskStatus.in_progress, "SCANNED", _model_to_dict(payload))
+
 
 @app.post("/tasks/{task_id}/complete", response_model=TaskOut)
 async def complete_task(task_id: UUID, db: AsyncSession = Depends(get_db)):
-    t = await service.set_status(db, task_id, TaskStatus.done, "COMPLETED")
-    return t
+    return await _change_status(db, task_id, TaskStatus.done, "COMPLETED")
+
 
 @app.post("/tasks/{task_id}/fail", response_model=TaskOut)
 async def fail_task(task_id: UUID, payload: FailPayload, db: AsyncSession = Depends(get_db)):
-    t = await service.set_status(db, task_id, TaskStatus.failed, "FAILED", payload.model_dump())
-    return t
+    return await _change_status(db, task_id, TaskStatus.failed, "FAILED", _model_to_dict(payload))
