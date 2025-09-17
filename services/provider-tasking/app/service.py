@@ -14,11 +14,12 @@ class InvalidStatusTransition(Exception):
 
 
 ALLOWED_TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
-    TaskStatus.new: {TaskStatus.assigned, TaskStatus.failed},
-    TaskStatus.assigned: {TaskStatus.in_progress, TaskStatus.failed},
-    TaskStatus.in_progress: {TaskStatus.done, TaskStatus.failed},
+    TaskStatus.new: {TaskStatus.assigned, TaskStatus.failed, TaskStatus.cancelled},
+    TaskStatus.assigned: {TaskStatus.in_progress, TaskStatus.failed, TaskStatus.cancelled},
+    TaskStatus.in_progress: {TaskStatus.done, TaskStatus.failed, TaskStatus.cancelled},
     TaskStatus.done: set(),
     TaskStatus.failed: set(),
+    TaskStatus.cancelled: set(),
 }
 
 async def create_task(db: AsyncSession, data: TaskCreate) -> Task:

@@ -12,6 +12,7 @@ class TaskStatus(str, enum.Enum):
     in_progress = "in_progress"
     done = "done"
     failed = "failed"
+    cancelled = "cancelled"
 
 class Task(Base):
     __tablename__ = "tasks"

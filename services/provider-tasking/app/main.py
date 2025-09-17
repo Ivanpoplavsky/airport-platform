@@ -30,6 +30,8 @@ async def get_tasks(status: List[TaskStatus] = Query(default=[]), db: AsyncSessi
     return tasks
 
 def _handle_transition_error(exc: InvalidStatusTransition) -> HTTPException:
+    """Convert service transition errors into HTTP conflict responses."""
+
     return HTTPException(status_code=409, detail=str(exc))
 
 
@@ -39,11 +41,11 @@ async def _change_status(
     new_status: TaskStatus,
     event: str,
     payload: dict | None = None,
-):
+) -> TaskOut:
     try:
         return await service.set_status(db, task_id, new_status, event, payload)
     except InvalidStatusTransition as exc:
-        raise _handle_transition_error(exc)
+        raise _handle_transition_error(exc) from exc
 
 
 # Создать задачу (для демонстрации/seed)
@@ -65,13 +67,8 @@ async def start_task(task_id: UUID, db: AsyncSession = Depends(get_db)):
 
 @app.post("/tasks/{task_id}/scan", response_model=TaskOut)
 async def scan_qr(task_id: UUID, payload: ScanPayload, db: AsyncSession = Depends(get_db)):
-    return await _change_status(
-        db,
-        task_id,
-        TaskStatus.in_progress,
-        "SCANNED",
-        payload.model_dump(mode="json"),
-    )
+    payload_data = payload.model_dump(mode="json")
+    return await _change_status(db, task_id, TaskStatus.in_progress, "SCANNED", payload_data)
 
 
 @app.post("/tasks/{task_id}/complete", response_model=TaskOut)
@@ -81,10 +78,5 @@ async def complete_task(task_id: UUID, db: AsyncSession = Depends(get_db)):
 
 @app.post("/tasks/{task_id}/fail", response_model=TaskOut)
 async def fail_task(task_id: UUID, payload: FailPayload, db: AsyncSession = Depends(get_db)):
-    return await _change_status(
-        db,
-        task_id,
-        TaskStatus.failed,
-        "FAILED",
-        payload.model_dump(mode="json"),
-    )
+    payload_data = payload.model_dump(mode="json")
+    return await _change_status(db, task_id, TaskStatus.failed, "FAILED", payload_data)
